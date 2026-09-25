@@ -1,0 +1,25 @@
+[package]
+name = "screenrec"
+version = "0.1.0"
+edition = "2021"
+description = "Cong cu CLI quay video man hinh + am thanh he thong cho Windows, xuat truc tiep ra MP4."
+
+[[bin]]
+name = "screenrec"
+path = "src/main.rs"
+
+[dependencies]
+# Thu vien chinh: boc an toan Windows Graphics Capture API / Desktop Duplication API,
+# kem san video encoder phan cung (Media Foundation) ho tro audio loopback -> MP4.
+# Nho do khong can cai/goi FFmpeg ngoai.
+windows-capture = "2"
+
+# Parse tham so dong lenh.
+clap = { version = "4", features = ["derive"] }
+
+# Xu ly Ctrl+C de dung quay an toan, dam bao file MP4 duoc finalize dung cach.
+ctrlc = "3.4"
+
+[profile.release]
+opt-level = 3
+lto = true
