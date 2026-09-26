@@ -2,23 +2,33 @@
 name = "screenrec"
 version = "0.1.0"
 edition = "2021"
-description = "Cong cu CLI quay video man hinh + am thanh he thong cho Windows, xuat truc tiep ra MP4."
+description = "Cong cu CLI quay video man hinh + am thanh he thong cho Windows, xuat ra MP4 qua FFmpeg."
 
 [[bin]]
 name = "screenrec"
 path = "src/main.rs"
 
 [dependencies]
-# Thu vien chinh: boc an toan Windows Graphics Capture API / Desktop Duplication API,
-# kem san video encoder phan cung (Media Foundation) ho tro audio loopback -> MP4.
-# Nho do khong can cai/goi FFmpeg ngoai.
+# Chi dung windows-capture de LAY FRAME MAN HINH THO (khong dung VideoEncoder
+# tich hop cua no, vi encoder do phu thuoc Windows Media Foundation - thu
+# khong co san tren Windows N/KN/LTSC neu thieu Media Feature Pack).
 windows-capture = "2"
+
+# Capture am thanh loopback (am thanh he thong) qua WASAPI, khong phu thuoc
+# Media Foundation.
+cpal = "0.15"
+
+# Ghi am thanh loopback ra file .wav chuan trong luc quay.
+hound = "3.5"
 
 # Parse tham so dong lenh.
 clap = { version = "4", features = ["derive"] }
 
-# Xu ly Ctrl+C de dung quay an toan, dam bao file MP4 duoc finalize dung cach.
+# Xu ly Ctrl+C de dung quay an toan.
 ctrlc = "3.4"
+
+# Dong goi loi gon gang.
+anyhow = "1"
 
 [profile.release]
 opt-level = 3
