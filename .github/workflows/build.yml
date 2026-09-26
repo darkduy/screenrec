@@ -1,5 +1,7 @@
 name: Build screenrec.exe
 
+# Chạy khi push code (nhánh main), khi tạo Pull Request, hoặc kích hoạt thủ công
+# từ tab Actions trên GitHub (workflow_dispatch).
 on:
   push:
     branches: [main]
@@ -8,7 +10,12 @@ on:
 
 jobs:
   build:
+    # Bắt buộc dùng runner Windows vì project phụ thuộc Windows Graphics Capture
+    # API — không thể cross-compile hay build trên Linux runner. Lưu ý: FFmpeg
+    # KHÔNG cần thiết ở bước build này (chương trình chỉ gọi "ffmpeg" lúc chạy
+    # thực tế) nên không cần cài đặt gì thêm ở đây.
     runs-on: windows-latest
+
     steps:
       - name: Checkout mã nguồn
         uses: actions/checkout@v4
@@ -18,6 +25,8 @@ jobs:
         with:
           targets: x86_64-pc-windows-msvc
 
+      # Cache thư mục ~/.cargo và target/ giữa các lần chạy để rút ngắn thời
+      # gian build đáng kể ở những lần sau (chỉ tải/biên dịch lại phần thay đổi).
       - name: Cache Cargo registry & target
         uses: actions/cache@v4
         with:
@@ -32,6 +41,8 @@ jobs:
       - name: Build bản release
         run: cargo build --release
 
+      # Upload trực tiếp file .exe làm artifact của workflow run — không cần
+      # tự đóng gói .zip; GitHub tự nén khi người dùng bấm tải xuống.
       - name: Upload screenrec.exe làm artifact
         uses: actions/upload-artifact@v4
         with:
