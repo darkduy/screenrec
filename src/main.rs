@@ -85,6 +85,9 @@ struct CaptureSettings {
 struct Capture {
     settings: CaptureSettings,
     frame_count: u64,
+    /// Buffer tái sử dụng giữa các frame để `as_nopadding_buffer` không phải
+    /// cấp phát bộ nhớ mới mỗi lần gọi — tối ưu hiệu năng khi quay ở fps cao.
+    scratch_buffer: Vec<u8>,
 }
 
 impl GraphicsCaptureApiHandler for Capture {
@@ -96,6 +99,7 @@ impl GraphicsCaptureApiHandler for Capture {
         Ok(Self {
             settings: ctx.flags,
             frame_count: 0,
+            scratch_buffer: Vec::new(),
         })
     }
 
@@ -107,9 +111,11 @@ impl GraphicsCaptureApiHandler for Capture {
         self.frame_count += 1;
 
         // Lấy buffer BGRA thô, KHÔNG padding — đúng định dạng FFmpeg cần khi
-        // được khai báo `-f rawvideo -pixel_format bgra`.
+        // được khai báo `-f rawvideo -pixel_format bgra`. `as_nopadding_buffer`
+        // ghi kết quả vào `scratch_buffer` (tái sử dụng qua từng frame) và trả
+        // về `&[u8]` trực tiếp, không phải `Result`.
         let mut buffer = frame.buffer()?;
-        let raw = buffer.as_nopadding_buffer()?;
+        let raw = buffer.as_nopadding_buffer(&mut self.scratch_buffer);
 
         // Ghi thẳng vào stdin của FFmpeg. LƯU Ý: đây là ghi đồng bộ (blocking) —
         // nếu FFmpeg encode chậm hơn tốc độ capture, pipe OS có thể đầy và
@@ -119,17 +125,23 @@ impl GraphicsCaptureApiHandler for Capture {
         // nên hiếm khi xảy ra. Nếu quay ở độ phân giải/fps rất cao và thấy hiện
         // tượng giật hoặc video bị chậm so với thực tế, cân nhắc hạ fps/bitrate
         // hoặc đổi preset FFmpeg sang "ultrafast".
-        {
+        let write_result = {
             let mut stdin = self
                 .settings
                 .ffmpeg_stdin
                 .lock()
                 .expect("Mutex ffmpeg_stdin bị poison");
-            if let Err(e) = stdin.write_all(raw) {
-                eprintln!("\nGhi frame vào FFmpeg thất bại (có thể FFmpeg đã thoát): {e}");
-                capture_control.stop();
-                return Ok(());
-            }
+            stdin.write_all(raw)
+        };
+        // Giải phóng borrow của `buffer`/`raw` ngay sau khi dùng xong, trước
+        // khi truy cập các field khác của `self` bên dưới — tránh phụ thuộc
+        // vào borrow-splitting phức tạp giữa `scratch_buffer` và `settings`.
+        drop(buffer);
+
+        if let Err(e) = write_result {
+            eprintln!("\nGhi frame vào FFmpeg thất bại (có thể FFmpeg đã thoát): {e}");
+            capture_control.stop();
+            return Ok(());
         }
 
         print!(
